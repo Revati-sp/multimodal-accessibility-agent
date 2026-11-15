@@ -1,0 +1,40 @@
+services:
+  gateway:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      MODEL_MODE: mock
+      DATABASE_URL: postgresql+psycopg://accesspilot:${POSTGRES_PASSWORD:-dev_only_password}@postgres:5432/accesspilot
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: accesspilot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_only_password}
+      POSTGRES_DB: accesspilot
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U accesspilot -d accesspilot"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - redisdata:/data
+volumes:
+  pgdata: {}
+  redisdata: {}
