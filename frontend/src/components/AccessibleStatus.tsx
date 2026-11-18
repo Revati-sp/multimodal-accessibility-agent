@@ -29,7 +29,7 @@ export function AnnouncerProvider({ children, speech: injected }: { children: Re
       const text = redactText(chooseText(a, speechRef.current.prefs.detail));
       // Identical consecutive text would not be re-read by some screen readers; vary it invisibly.
       const set = a.politeness === 'assertive' ? setAssertive : setPolite;
-      set((prev) => (prev === text ? `${text} ` : text));
+      set((prev) => (prev === text ? `${text}\u00a0` : text));
       speechRef.current.speak(text, { interrupt: a.politeness === 'assertive' });
       return true;
     },

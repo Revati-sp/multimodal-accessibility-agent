@@ -155,6 +155,7 @@ export function createMockTransport(options: MockTransportOptions = {}): MockTra
           kind: 'task.updated',
           message: 'Simulated: plan changed in another session (reminder time 18:00); this update was not streamed to this page.',
         });
+        journal(rec, { kind: 'approval.requested', step_id: step.id, message: `Approval requested again for plan version ${v}` });
       }, Math.max(1, stepDelayMs / 2));
     }
   };
