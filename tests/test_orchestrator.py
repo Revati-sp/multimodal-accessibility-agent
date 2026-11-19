@@ -69,6 +69,77 @@ def test_pause_resume_stop_and_correct_follow_the_transition_table():
     assert stopped.journal[-1]["action"] == "STOP"
 
 
+def test_correct_without_a_clock_pauses_and_does_not_guess_a_date():
+    store = MemoryTaskStore()
+    view = store.create("Create a calendar reminder for my assignment")
+    calls = []
+    corrected = store.interrupt(
+        view.task_id,
+        "CORRECT",
+        "Actually Thursday",
+        reconcile=lambda *args: calls.append(args),
+    )
+    assert corrected.status == TaskStatus.PAUSED
+    assert corrected.plan.version == 2
+    assert [step.status for step in corrected.plan.steps] == [
+        StepStatus.PENDING,
+        StepStatus.PENDING,
+        StepStatus.PENDING,
+    ]
+    assert calls == []
+
+
+def test_date_correction_invalidates_only_the_write_and_its_descendants():
+    store = MemoryTaskStore()
+    view = store.create(
+        "Remind me 30 minutes before Thursday at 4 pm",
+        clock=_CLOCK,
+        timezone=_ZONE,
+    )
+    view.plan.steps[0].status = StepStatus.VERIFIED
+    view.plan.steps[1].status = StepStatus.VERIFIED
+    seen = []
+
+    def reconcile(task_id, step, plan_version):
+        seen.append((task_id, step.id, step.status, plan_version))
+
+    corrected = store.interrupt(
+        view.task_id,
+        "CORRECT",
+        "Remind me Friday at 5 pm",
+        clock=_CLOCK,
+        timezone=_ZONE,
+        reconcile=reconcile,
+    )
+    read, write, verify = corrected.plan.steps
+    assert corrected.status == TaskStatus.PAUSED
+    assert corrected.plan.version == 2
+    assert read.status == StepStatus.VERIFIED
+    assert write.status == StepStatus.INVALIDATED
+    assert verify.status == StepStatus.INVALIDATED
+    assert write.arguments["date"] == "2026-11-20"
+    assert write.arguments["time"] == "17:00"
+    assert all(step.plan_version == 2 for step in corrected.plan.steps)
+    assert seen == [(view.task_id, "create-event", StepStatus.VERIFIED, 1)]
+
+
+def test_impossible_correction_leaves_the_task_unchanged():
+    store = MemoryTaskStore()
+    view = store.create("Create a calendar reminder for my assignment", clock=_CLOCK, timezone=_ZONE)
+    before = list(view.journal)
+    with pytest.raises(ValueError, match="invalid transition"):
+        store.interrupt(
+            view.task_id,
+            "CORRECT",
+            "Schedule 31 February 2026",
+            clock=_CLOCK,
+            timezone=_ZONE,
+        )
+    assert view.status == TaskStatus.CREATED
+    assert view.plan.version == 1
+    assert view.journal == before
+
+
 def test_resume_is_only_legal_from_paused():
     store = MemoryTaskStore()
     view = store.create("Create a calendar reminder for my assignment")
