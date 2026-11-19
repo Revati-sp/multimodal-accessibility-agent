@@ -72,11 +72,12 @@ describe('mock transport (demo backend)', () => {
   it('refuses an approval for an old plan version with 409 stale plan version', async () => {
     setup();
     const task = await create('stale-approval');
-    await waitFor(async () => expect((await transport.getTask(task.task_id)).plan.version).toBe(2));
+    await waitFor(async () => expect(await statusOf(task.task_id)).toBe('AWAITING_APPROVAL'));
     await expect(transport.submitApproval(task.task_id, 'create-event', { approved: true, plan_version: 1 })).rejects.toMatchObject({
       status: 409,
       detail: 'stale plan version',
     });
+    expect((await transport.getTask(task.task_id)).plan.version).toBe(2);
     await transport.submitApproval(task.task_id, 'create-event', { approved: true, plan_version: 2 });
   });
 

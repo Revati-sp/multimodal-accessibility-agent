@@ -40,11 +40,13 @@ interface NewTaskPageProps {
   onCreated(task: TaskView): void;
   browserAdapter: SpeechInputAdapter;
   simulatedAdapter?: SpeechInputAdapter | undefined;
+  /** Move focus to the heading on mount (after in-app navigation, not on first page load). */
+  focusHeading?: boolean;
 }
 
-export function NewTaskPage({ transport, onCreated, browserAdapter, simulatedAdapter }: NewTaskPageProps) {
+export function NewTaskPage({ transport, onCreated, browserAdapter, simulatedAdapter, focusHeading = true }: NewTaskPageProps) {
   const headingRef = useRef<HTMLHeadingElement>(null);
-  usePageFocus(headingRef, 'New task');
+  usePageFocus(headingRef, 'New task', focusHeading);
   const instructionRef = useRef<HTMLTextAreaElement>(null);
   const timezoneRef = useRef<HTMLInputElement>(null);
   const mic = useMicrophone();

@@ -20,14 +20,19 @@ export function parseHash(hash: string): Route {
   return { name: 'new' };
 }
 
-function useHashRoute(): Route {
+/** Returns the route and whether the user has navigated within the app (for focus management). */
+function useHashRoute(): [Route, boolean] {
   const [route, setRoute] = useState(() => parseHash(window.location.hash));
+  const [navigated, setNavigated] = useState(false);
   useEffect(() => {
-    const onChange = () => setRoute(parseHash(window.location.hash));
+    const onChange = () => {
+      setNavigated(true);
+      setRoute(parseHash(window.location.hash));
+    };
     window.addEventListener('hashchange', onChange);
     return () => window.removeEventListener('hashchange', onChange);
   }, []);
-  return route;
+  return [route, navigated];
 }
 
 function ModeBanner({ transport }: { transport: Transport }) {
@@ -73,7 +78,8 @@ export interface AppProps {
 }
 
 export function App({ transport, pollIntervalMs = 3000, browserSpeechAdapter, simulatedSpeechAdapter, speech }: AppProps) {
-  const route = useHashRoute();
+  // On first load focus stays at the document start so the skip link is the first Tab stop.
+  const [route, navigated] = useHashRoute();
   const [sessionTasks, setSessionTasks] = useState<SessionTask[]>([]);
   const browserAdapter = useMemo(() => browserSpeechAdapter ?? createBrowserSpeechAdapter(), [browserSpeechAdapter]);
   const simulatedAdapter = useMemo(
@@ -127,11 +133,11 @@ export function App({ transport, pollIntervalMs = 3000, browserSpeechAdapter, si
       </header>
       <main id="main" tabIndex={-1} className="wrap">
         {route.name === 'new' && (
-          <NewTaskPage key="new" transport={transport} onCreated={onCreated} browserAdapter={browserAdapter} simulatedAdapter={simulatedAdapter} />
+          <NewTaskPage key="new" transport={transport} onCreated={onCreated} browserAdapter={browserAdapter} simulatedAdapter={simulatedAdapter} focusHeading={navigated} />
         )}
-        {route.name === 'task' && <TaskProgressPage key={route.id} transport={transport} taskId={route.id} pollIntervalMs={pollIntervalMs} />}
+        {route.name === 'task' && <TaskProgressPage key={route.id} transport={transport} taskId={route.id} pollIntervalMs={pollIntervalMs} focusHeading={navigated} />}
         {route.name === 'history' && (
-          <TaskHistoryPage key={`history-${route.id ?? ''}`} transport={transport} sessionTasks={sessionTasks} selectedId={route.id} />
+          <TaskHistoryPage key={`history-${route.id ?? ''}`} transport={transport} sessionTasks={sessionTasks} selectedId={route.id} focusHeading={navigated} />
         )}
       </main>
       <footer className="site-footer">

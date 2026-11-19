@@ -53,6 +53,7 @@ interface TaskProgressPageProps {
   transport: Transport;
   taskId: string;
   pollIntervalMs: number;
+  focusHeading?: boolean;
 }
 
 interface DecisionState {
@@ -62,9 +63,9 @@ interface DecisionState {
   confirmedText?: string;
 }
 
-export function TaskProgressPage({ transport, taskId, pollIntervalMs }: TaskProgressPageProps) {
+export function TaskProgressPage({ transport, taskId, pollIntervalMs, focusHeading = true }: TaskProgressPageProps) {
   const headingRef = useRef<HTMLHeadingElement>(null);
-  usePageFocus(headingRef, 'Task progress');
+  usePageFocus(headingRef, 'Task progress', focusHeading);
   const { announce } = useAnnouncer();
   const { task, loading, error, refresh, accept } = useTask(transport, taskId);
   const taskRef = useRef<TaskView | undefined>(task);

@@ -17,11 +17,12 @@ interface TaskHistoryPageProps {
   transport: Transport;
   sessionTasks: SessionTask[];
   selectedId: string | undefined;
+  focusHeading?: boolean;
 }
 
-export function TaskHistoryPage({ transport, sessionTasks, selectedId }: TaskHistoryPageProps) {
+export function TaskHistoryPage({ transport, sessionTasks, selectedId, focusHeading = true }: TaskHistoryPageProps) {
   const headingRef = useRef<HTMLHeadingElement>(null);
-  usePageFocus(headingRef, 'Task history');
+  usePageFocus(headingRef, 'Task history', focusHeading);
   const [journal, setJournal] = useState<JournalResponse>();
   const [summary, setSummary] = useState<SummaryResponse>();
   const [error, setError] = useState<unknown>();

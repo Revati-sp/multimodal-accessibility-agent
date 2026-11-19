@@ -139,25 +139,6 @@ export function createMockTransport(options: MockTransportOptions = {}): MockTra
     rec.view.status = 'AWAITING_APPROVAL';
     journal(rec, { kind: 'approval.requested', step_id: step.id, message: `Approval requested for ${step.action}` });
     emit(rec, 'approval.requested', { step_id: step.id, status: 'AWAITING_APPROVAL', risk_tier: step.risk_tier });
-    if (rec.scenario === 'stale-approval' && !rec.staleBumped) {
-      // Simulates a correction made elsewhere whose event never reached this client.
-      later(() => {
-        if (rec.view.status !== 'AWAITING_APPROVAL') return;
-        rec.staleBumped = true;
-        const v = rec.view.plan.version + 1;
-        rec.view.plan = {
-          ...rec.view.plan,
-          version: v,
-          steps: rec.view.plan.steps.map((s) => ({ ...s, plan_version: v, arguments: s.id === step.id ? { ...s.arguments, time: '18:00' } : s.arguments })),
-        };
-        rec.pendingApproval = { stepId: step.id, planVersion: v };
-        journal(rec, {
-          kind: 'task.updated',
-          message: 'Simulated: plan changed in another session (reminder time 18:00); this update was not streamed to this page.',
-        });
-        journal(rec, { kind: 'approval.requested', step_id: step.id, message: `Approval requested again for plan version ${v}` });
-      }, Math.max(1, stepDelayMs / 2));
-    }
   };
 
   const advance = (rec: TaskRecord) => {
@@ -369,6 +350,20 @@ export function createMockTransport(options: MockTransportOptions = {}): MockTra
       return respond(() => {
         const rec = getRecord(taskId);
         const v = rec.view;
+        if (rec.scenario === 'stale-approval' && !rec.staleBumped && v.status === 'AWAITING_APPROVAL') {
+          // Simulates a correction made in another session that lands just before this decision,
+          // and whose update never reached this page.
+          rec.staleBumped = true;
+          const next = v.plan.version + 1;
+          v.plan = {
+            ...v.plan,
+            version: next,
+            steps: v.plan.steps.map((s) => ({ ...s, plan_version: next, arguments: s.action === 'create_calendar_event' ? { ...s.arguments, time: '18:00' } : s.arguments })),
+          };
+          if (rec.pendingApproval) rec.pendingApproval = { stepId: rec.pendingApproval.stepId, planVersion: next };
+          journal(rec, { kind: 'task.updated', message: 'Simulated: plan changed in another session (reminder time 18:00); this update was not streamed to this page.' });
+          journal(rec, { kind: 'approval.requested', step_id: rec.pendingApproval?.stepId, message: `Approval requested again for plan version ${next}` });
+        }
         if (request.plan_version !== v.plan.version) throw new ApiError('conflict', 'stale plan version', 409);
         const step = stepById(rec, stepId);
         if (!step) throw new ApiError('not_found', 'unknown step', 404);
