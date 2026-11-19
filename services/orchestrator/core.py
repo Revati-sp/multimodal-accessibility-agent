@@ -1,15 +1,21 @@
 """Deterministic mock orchestrator. Does not claim to be a real LLM agent."""
 from uuid import uuid4
-from shared.schemas import Plan, TaskStep, TaskStatus, StepStatus, TaskView, RiskTier
+from services.orchestrator.planner import generate
+from shared.schemas import Plan, TaskStatus, StepStatus, TaskView
 
 class MemoryTaskStore:
     def __init__(self): self.records={}
-    def create(self,instruction):
+    def create(self, instruction, *, clock=None, timezone=None):
         tid=str(uuid4())
-        steps=[TaskStep(id='read-deadline',plan_version=1,action='read_deadline',application='student_portal',risk_tier=RiskTier.T0),
-               TaskStep(id='create-event',plan_version=1,action='create_calendar_event',application='mock_calendar',depends_on=['read-deadline'],risk_tier=RiskTier.T1),
-               TaskStep(id='verify-event',plan_version=1,action='verify_calendar_event',application='mock_calendar',depends_on=['create-event'],risk_tier=RiskTier.T0)]
-        v=TaskView(task_id=tid,instruction=instruction,status=TaskStatus.CREATED,plan=Plan(task_id=tid,goal=instruction,version=1,steps=steps),journal=[{'kind':'task.created','message':'Mock plan created; no external action executed'}]);self.records[tid]=v;return v
+        context={"task_id": tid}
+        if clock is not None:
+            context["clock"]=clock
+        if timezone is not None:
+            context["timezone"]=timezone
+        plan=generate(instruction, context)
+        view=TaskView(task_id=tid,instruction=instruction,status=TaskStatus.CREATED,plan=plan,journal=[{"kind":"task.created","message":"Mock plan created; no external action executed"}])
+        self.records[tid]=view
+        return view
     def get(self,tid):return self.records.get(tid)
     def interrupt(self,tid,kind,instruction=None):
         obj=self.records[tid]
